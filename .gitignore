@@ -141,3 +141,31 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+
+
+# =========================
+# PYTHON BACKEND
+# =========================
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Caché compilada de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Herramientas de Python (pytest, mypy, etc)
+.pytest_cache/
+.mypy_cache/
+
+# =========================
+# SISTEMA OPERATIVO
+# =========================
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
