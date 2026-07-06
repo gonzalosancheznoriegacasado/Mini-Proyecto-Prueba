@@ -23,6 +23,7 @@ def create_expense(
         group_id=expense_in.group_id,
         description=expense_in.description,
         amount=expense_in.amount,
+        category=expense_in.category,
         payer_id=expense_in.payer_id,
         date=expense_in.date
     )

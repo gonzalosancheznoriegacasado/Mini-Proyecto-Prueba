@@ -8,6 +8,7 @@ class ExpenseCreate(BaseModel):
     group_id: UUID
     description: str
     amount: float
+    category: str
     payer_id: UUID
     date: datetime
     participants_ids: List[UUID]
@@ -17,6 +18,7 @@ class ExpenseResponse(BaseModel):
     group_id: UUID
     description: str
     amount: float
+    category: str
     payer_id: UUID
     date: datetime
     participants_ids: List[UUID] = Field(default_factory=list)

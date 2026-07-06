@@ -19,6 +19,7 @@ class Expense(Base):
     group_id = Column(UUID(as_uuid=True), ForeignKey("groups.id"), nullable=False)
     description = Column(String, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
+    category = Column(String, nullable=False)
     payer_id = Column(UUID(as_uuid=True), ForeignKey("persons.id"), nullable=False)
     date = Column(DateTime, nullable=False)
 
