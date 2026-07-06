@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
-from typing import List
+from typing import List, Optional
+from uuid import UUID
 
 from backend.models.expense import Expense
 from backend.models.person import Person
-from backend.schemas.expense import ExpenseCreate, ExpenseResponse
+from backend.schemas.expense import ExpenseCreate, ExpenseResponse, PaginatedExpenseResponse
 from backend.api.deps import get_db, get_current_user
 
 router = APIRouter()
@@ -37,17 +38,39 @@ def create_expense(
     db.refresh(new_expense)
     return new_expense
 
-@router.get("/", response_model=List[ExpenseResponse])
+@router.get("/", response_model=PaginatedExpenseResponse)
 def get_expenses(
+    group_id: Optional[UUID] = None,
+    payer_id: Optional[UUID] = None,
+    category: Optional[str] = None,
+    limit: int = 10,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: Person = Depends(get_current_user)
 ):
     """
-    Devuelve la lista de todos los gastos incluyendo la información de la persona que pagó (payer).
+    Devuelve la lista de gastos aplicando filtros opcionales y paginación.
     """
+    query = db.query(Expense)
+    
+    if group_id:
+        query = query.filter(Expense.group_id == group_id)
+    if payer_id:
+        query = query.filter(Expense.payer_id == payer_id)
+    if category:
+        query = query.filter(Expense.category == category)
+        
+    total = query.count()
+    
     # Usamos joinedload para cargar ansiosamente los datos del payer (Person) y los participants
-    expenses = db.query(Expense).options(
+    expenses = query.options(
         joinedload(Expense.payer),
         joinedload(Expense.participants)
-    ).all()
-    return expenses
+    ).offset(offset).limit(limit).all()
+    
+    return {
+        "data": expenses,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }

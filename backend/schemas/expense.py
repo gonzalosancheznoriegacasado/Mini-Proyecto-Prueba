@@ -33,3 +33,9 @@ class ExpenseResponse(BaseModel):
         if hasattr(obj, "participants") and obj.participants is not None:
             obj.participants_ids = [p.id for p in obj.participants]
         return super().model_validate(obj, *args, **kwargs)
+
+class PaginatedExpenseResponse(BaseModel):
+    data: List[ExpenseResponse]
+    total: int
+    limit: int
+    offset: int
