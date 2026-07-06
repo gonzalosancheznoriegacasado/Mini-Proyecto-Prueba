@@ -1,9 +1,16 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey
+from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from backend.db.database import Base
+
+expense_participants = Table(
+    'expense_participants',
+    Base.metadata,
+    Column('expense_id', UUID(as_uuid=True), ForeignKey('expenses.id'), primary_key=True),
+    Column('person_id', UUID(as_uuid=True), ForeignKey('persons.id'), primary_key=True)
+)
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -16,3 +23,6 @@ class Expense(Base):
 
     # Relación para acceder a la persona que pagó el gasto
     payer = relationship("Person", back_populates="expenses")
+
+    # Relación a las personas que participan en el gasto
+    participants = relationship("Person", secondary=expense_participants, backref="shared_expenses")

@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict, Any
 from backend.models.person import Person
 from backend.models.expense import Expense
@@ -17,23 +17,33 @@ def calculate_balances(db: Session) -> List[Dict[str, Any]]:
     """
     # 1. Obtener datos: Consulta a la base de datos para usuarios y gastos
     persons = db.query(Person).all()
-    expenses = db.query(Expense).all()
+    # Usamos joinedload para obtener los participantes de cada gasto
+    expenses = db.query(Expense).options(joinedload(Expense.participants)).all()
 
     # Manejo de casos especiales: si no hay personas o no hay gastos
     if not persons or not expenses:
         return []
 
-    # 2. Calcular gasto total y cuota justa
-    total_expenses = sum(float(expense.amount) for expense in expenses)
-    fair_share = total_expenses / len(persons)
-
     # 3. Calcular saldo neto por persona
-    # Inicialmente, cada persona debe su "cuota justa" (saldo negativo)
-    balances = {person.id: -fair_share for person in persons}
+    # Inicialmente, el balance de todos es 0
+    balances = {person.id: 0.0 for person in persons}
 
-    # Por cada gasto, sumamos el importe al saldo de la persona que lo pagó
-    # (Lo que ha pagado se vuelve a su favor)
+    # Por cada gasto, el importe se divide entre los participantes específicos
     for expense in expenses:
+        participants = expense.participants
+        # Si un gasto no tiene participantes definidos, por defecto podríamos asumir
+        # que no afecta o dividirlo entre todos. Aquí seguimos la regla de V2 estricta:
+        if not participants:
+            continue
+            
+        fair_share = float(expense.amount) / len(participants)
+        
+        # Restamos la cuota justa a cada participante del gasto
+        for participant in participants:
+            if participant.id in balances:
+                balances[participant.id] -= fair_share
+                
+        # Sumamos el total del gasto al pagador
         if expense.payer_id in balances:
             balances[expense.payer_id] += float(expense.amount)
 
