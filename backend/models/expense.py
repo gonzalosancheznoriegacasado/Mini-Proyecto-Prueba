@@ -16,6 +16,7 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(UUID(as_uuid=True), ForeignKey("groups.id"), nullable=False)
     description = Column(String, nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     payer_id = Column(UUID(as_uuid=True), ForeignKey("persons.id"), nullable=False)
@@ -23,6 +24,9 @@ class Expense(Base):
 
     # Relación para acceder a la persona que pagó el gasto
     payer = relationship("Person", back_populates="expenses")
+    
+    # Relación hacia el grupo
+    group = relationship("Group", back_populates="expenses")
 
     # Relación a las personas que participan en el gasto
     participants = relationship("Person", secondary=expense_participants, backref="shared_expenses")

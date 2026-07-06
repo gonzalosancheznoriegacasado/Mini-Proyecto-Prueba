@@ -20,6 +20,7 @@ def create_expense(
     Registra un nuevo gasto.
     """
     new_expense = Expense(
+        group_id=expense_in.group_id,
         description=expense_in.description,
         amount=expense_in.amount,
         payer_id=expense_in.payer_id,

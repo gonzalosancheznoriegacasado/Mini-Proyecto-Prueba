@@ -1,24 +1,23 @@
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict, Any
+from uuid import UUID
 from backend.models.person import Person
 from backend.models.expense import Expense
+from backend.models.group import Group
 
-def calculate_balances(db: Session) -> List[Dict[str, Any]]:
+def calculate_balances(db: Session, group_id: UUID) -> List[Dict[str, Any]]:
     """
     Calcula los balances netos del grupo y genera las transferencias
     mínimas necesarias para que todo el mundo quede a pre.
-    
-    Devuelve una lista de diccionarios con el formato:
-    {
-        "debtor_id": string (UUID),
-        "creditor_id": string (UUID),
-        "amount": float
-    }
     """
-    # 1. Obtener datos: Consulta a la base de datos para usuarios y gastos
-    persons = db.query(Person).all()
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        return []
+
+    # 1. Obtener datos: Consulta a la base de datos para usuarios y gastos del grupo
+    persons = group.members
     # Usamos joinedload para obtener los participantes de cada gasto
-    expenses = db.query(Expense).options(joinedload(Expense.participants)).all()
+    expenses = db.query(Expense).filter(Expense.group_id == group_id).options(joinedload(Expense.participants)).all()
 
     # Manejo de casos especiales: si no hay personas o no hay gastos
     if not persons or not expenses:
@@ -80,6 +79,7 @@ def calculate_balances(db: Session) -> List[Dict[str, Any]]:
         
         if transfer_amount > 0:
             transactions.append({
+                "group_id": str(group_id),
                 "debtor_id": str(debtor["id"]),
                 "creditor_id": str(creditor["id"]),
                 "amount": transfer_amount

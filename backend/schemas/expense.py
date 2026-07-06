@@ -5,6 +5,7 @@ from typing import List
 from backend.schemas.person import PersonResponse
 
 class ExpenseCreate(BaseModel):
+    group_id: UUID
     description: str
     amount: float
     payer_id: UUID
@@ -13,6 +14,7 @@ class ExpenseCreate(BaseModel):
 
 class ExpenseResponse(BaseModel):
     id: UUID
+    group_id: UUID
     description: str
     amount: float
     payer_id: UUID
