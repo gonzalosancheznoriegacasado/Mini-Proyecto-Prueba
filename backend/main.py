@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.api.routes import persons, expenses, balances
+from backend.api.routes import persons, expenses, balances, auth
 
 app = FastAPI(
     title="Mini-Tricount API",
@@ -8,6 +8,7 @@ app = FastAPI(
 )
 
 # Conectar el router de personas al archivo principal
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(persons.router, prefix="/persons", tags=["persons"])
 app.include_router(expenses.router, prefix="/expenses", tags=["expenses"])
 app.include_router(balances.router, prefix="/balances", tags=["balances"])

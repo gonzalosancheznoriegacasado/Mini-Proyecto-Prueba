@@ -6,12 +6,16 @@ from typing import List
 from backend.models.expense import Expense
 from backend.models.person import Person
 from backend.schemas.expense import ExpenseCreate, ExpenseResponse
-from backend.api.deps import get_db
+from backend.api.deps import get_db, get_current_user
 
 router = APIRouter()
 
 @router.post("/", response_model=ExpenseResponse, status_code=201)
-def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
+def create_expense(
+    expense_in: ExpenseCreate, 
+    db: Session = Depends(get_db),
+    current_user: Person = Depends(get_current_user)
+):
     """
     Registra un nuevo gasto.
     """
@@ -32,7 +36,10 @@ def create_expense(expense_in: ExpenseCreate, db: Session = Depends(get_db)):
     return new_expense
 
 @router.get("/", response_model=List[ExpenseResponse])
-def get_expenses(db: Session = Depends(get_db)):
+def get_expenses(
+    db: Session = Depends(get_db),
+    current_user: Person = Depends(get_current_user)
+):
     """
     Devuelve la lista de todos los gastos incluyendo la información de la persona que pagó (payer).
     """
