@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -13,6 +13,7 @@ router = APIRouter()
 @router.get("/{group_id}/balances", response_model=List[BalanceResponse])
 def get_balances(
     group_id: UUID,
+    optimize: bool = Query(False, description="Optimizar deudas para minimizar transacciones (algoritmo Greedy)"),
     db: Session = Depends(get_db),
     current_user: Person = Depends(get_current_user)
 ):
@@ -20,7 +21,7 @@ def get_balances(
     Calcula y devuelve las transferencias necesarias para liquidar las deudas del grupo.
     Devuelve la información procesada por nuestro motor interno de balances.
     """
-    balances = calculate_balances(db, group_id)
+    balances = calculate_balances(db, group_id, optimize=optimize)
     # The schemas expect group_id to be populated. The calculate_balances service 
     # will add it to the dictionaries.
     return balances

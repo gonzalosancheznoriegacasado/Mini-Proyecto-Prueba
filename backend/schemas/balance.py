@@ -6,3 +6,4 @@ class BalanceResponse(BaseModel):
     debtor_id: UUID
     creditor_id: UUID
     amount: float
+    is_optimized: bool = False
