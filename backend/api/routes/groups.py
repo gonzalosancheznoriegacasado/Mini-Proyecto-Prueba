@@ -7,9 +7,13 @@ from uuid import UUID
 from backend.models.group import Group, GroupMember, RoleEnum
 from backend.models.expense import Expense
 from backend.models.person import Person
+from backend.models.invitation import Invitation
 from backend.schemas.group import GroupCreate, GroupResponse, CategoryStatistic
+from backend.schemas.invitation import InvitationResponse
 from backend.api.deps import get_db, get_current_user
 from backend.api.rbac import require_group_admin
+import secrets
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -79,3 +83,78 @@ def get_group_statistics(
     ).filter(Expense.group_id == group_id).group_by(Expense.category).all()
     
     return [{"category": stat.category, "total_amount": stat.total_amount} for stat in stats]
+
+@router.post("/{group_id}/generate-invite", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
+def generate_invite(
+    group_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Person = Depends(get_current_user)
+):
+    # Validar que el grupo existe
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+
+    # Verificar que el usuario actual pertenece al grupo
+    membership = db.query(GroupMember).filter(
+        GroupMember.group_id == group_id,
+        GroupMember.person_id == current_user.id
+    ).first()
+    
+    if not membership:
+        raise HTTPException(status_code=403, detail="No perteneces a este grupo")
+
+    # Generar token y fecha de expiración (por defecto 48h)
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=48)
+
+    # Crear invitación
+    new_invitation = Invitation(
+        group_id=group_id,
+        token=token,
+        created_by=current_user.id,
+        expires_at=expires_at
+    )
+    
+    db.add(new_invitation)
+    db.commit()
+    db.refresh(new_invitation)
+
+    return new_invitation
+
+@router.post("/join/{token}", status_code=status.HTTP_200_OK)
+def join_group(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: Person = Depends(get_current_user)
+):
+    # Buscar el token en la base de datos
+    invitation = db.query(Invitation).filter(Invitation.token == token).first()
+    
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+        
+    # Verificar si el token ya expiró
+    if invitation.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="La invitación ha expirado")
+        
+    # Verificar si el usuario ya es miembro de ese grupo
+    existing_member = db.query(GroupMember).filter(
+        GroupMember.group_id == invitation.group_id,
+        GroupMember.person_id == current_user.id
+    ).first()
+    
+    if existing_member:
+        raise HTTPException(status_code=400, detail="Ya eres miembro de este grupo")
+        
+    # Unir al usuario al grupo
+    new_member = GroupMember(
+        group_id=invitation.group_id,
+        person_id=current_user.id,
+        role=RoleEnum.MEMBER
+    )
+    
+    db.add(new_member)
+    db.commit()
+    
+    return {"message": "Te has unido al grupo exitosamente", "group_id": str(invitation.group_id)}
