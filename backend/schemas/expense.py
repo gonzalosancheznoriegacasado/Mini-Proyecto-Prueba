@@ -3,6 +3,20 @@ from uuid import UUID
 from datetime import datetime
 from typing import List
 from backend.schemas.person import PersonResponse
+from backend.models.expense import SplitType
+
+class ExpenseSplitCreate(BaseModel):
+    user_id: UUID
+    split_type: SplitType
+    split_value: float = 0.0
+
+class ExpenseSplitResponse(BaseModel):
+    user_id: UUID
+    split_type: SplitType
+    split_value: float
+    calculated_amount: float
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class ExpenseCreate(BaseModel):
     group_id: UUID
@@ -11,7 +25,7 @@ class ExpenseCreate(BaseModel):
     category: str
     payer_id: UUID
     date: datetime
-    participants_ids: List[UUID]
+    splits: List[ExpenseSplitCreate]
 
 class ExpenseResponse(BaseModel):
     id: UUID
@@ -21,18 +35,10 @@ class ExpenseResponse(BaseModel):
     category: str
     payer_id: UUID
     date: datetime
-    participants_ids: List[UUID] = Field(default_factory=list)
+    splits: List[ExpenseSplitResponse] = Field(default_factory=list)
     payer: PersonResponse
 
     model_config = ConfigDict(from_attributes=True)
-
-    # Convert the list of participant objects to a list of UUIDs
-    @classmethod
-    def model_validate(cls, obj, *args, **kwargs):
-        # We need to extract participants_ids from the ORM object if it exists
-        if hasattr(obj, "participants") and obj.participants is not None:
-            obj.participants_ids = [p.id for p in obj.participants]
-        return super().model_validate(obj, *args, **kwargs)
 
 class PaginatedExpenseResponse(BaseModel):
     data: List[ExpenseResponse]

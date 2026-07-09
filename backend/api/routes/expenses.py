@@ -8,6 +8,7 @@ from backend.models.expense import Expense
 from backend.models.person import Person
 from backend.schemas.expense import ExpenseCreate, ExpenseResponse, PaginatedExpenseResponse
 from backend.api.deps import get_db, get_current_user
+from backend.services.expense_service import calculate_splits
 
 router = APIRouter()
 
@@ -29,9 +30,9 @@ def create_expense(
         date=expense_in.date
     )
     
-    if expense_in.participants_ids:
-        participants = db.query(Person).filter(Person.id.in_(expense_in.participants_ids)).all()
-        new_expense.participants = participants
+    # Calcular y validar los splits
+    splits = calculate_splits(expense_in.amount, expense_in.splits)
+    new_expense.splits = splits
 
     db.add(new_expense)
     db.commit()
@@ -62,10 +63,10 @@ def get_expenses(
         
     total = query.count()
     
-    # Usamos joinedload para cargar ansiosamente los datos del payer (Person) y los participants
+    # Usamos joinedload para cargar ansiosamente los datos del payer (Person) y los splits
     expenses = query.options(
         joinedload(Expense.payer),
-        joinedload(Expense.participants)
+        joinedload(Expense.splits)
     ).offset(offset).limit(limit).all()
     
     return {
