@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { useAuth } from './AuthContext';
 import { useGroup } from './GroupContext';
 import type { Balance, CategoryStatistic, Expense, ExpenseCreatePayload, ExpenseFiltersState, PaginatedExpenses } from '../types';
+import { OPTIMIZE_BALANCES_KEY } from '../types';
 
 interface AppContextType {
   expenses: Expense[];
@@ -12,7 +13,9 @@ interface AppContextType {
   loading: boolean;
   error: string | null;
   filters: ExpenseFiltersState;
+  optimizeBalances: boolean;
   setFilters: (filters: Partial<ExpenseFiltersState>) => void;
+  setOptimizeBalances: (value: boolean) => void;
   addExpense: (expense: ExpenseCreatePayload) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   refreshExpenses: () => Promise<void>;
@@ -47,9 +50,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFiltersState] = useState<ExpenseFiltersState>(INITIAL_FILTERS);
+  const [optimizeBalances, setOptimizeBalancesState] = useState<boolean>(() => localStorage.getItem(OPTIMIZE_BALANCES_KEY) === 'true');
 
   const setFilters = useCallback((next: Partial<ExpenseFiltersState>) => {
     setFiltersState((prev) => ({ ...prev, ...next }));
+  }, []);
+
+  const setOptimizeBalances = useCallback((value: boolean) => {
+    setOptimizeBalancesState(value);
+    localStorage.setItem(OPTIMIZE_BALANCES_KEY, String(value));
   }, []);
 
   const refreshExpenses = useCallback(async () => {
@@ -102,7 +111,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const { data } = await api.get<Balance[]>(`/groups/${activeGroup.id}/balances`);
+      const { data } = await api.get<Balance[]>(`/groups/${activeGroup.id}/balances${optimizeBalances ? '?optimize=true' : ''}`);
       setBalances(data ?? []);
     } catch (err: unknown) {
       console.error(err);
@@ -187,7 +196,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loading,
         error,
         filters,
+        optimizeBalances,
         setFilters,
+        setOptimizeBalances,
         addExpense,
         deleteExpense,
         refreshExpenses,

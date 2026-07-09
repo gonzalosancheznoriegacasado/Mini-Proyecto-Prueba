@@ -12,6 +12,32 @@ export interface Group {
   created_at: string;
 }
 
+export type GroupRole = 'ADMIN' | 'MEMBER';
+
+export interface GroupMember {
+  group_id: string;
+  user_id: string;
+  role: GroupRole;
+  joined_at: string;
+  user?: User;
+}
+
+export interface CustomCategory {
+  id: string;
+  group_id: string;
+  name: string;
+  color_hex: string;
+}
+
+export type SplitType = 'EQUAL' | 'EXACT' | 'PERCENTAGE' | 'SHARES';
+
+export interface ExpenseSplit {
+  user_id: string;
+  split_type: SplitType;
+  split_value: number;
+  calculated_amount: number;
+}
+
 export interface Expense {
   id: string;
   group_id: string;
@@ -19,8 +45,10 @@ export interface Expense {
   amount: number;
   payer_id: string;
   category: string;
+  category_id?: string;
   date: string;
-  participants_ids: string[];
+  participants_ids?: string[];
+  splits?: ExpenseSplit[];
   payer?: User;
 }
 
@@ -29,6 +57,26 @@ export interface Balance {
   debtor_id: string;
   creditor_id: string;
   amount: number;
+  is_optimized?: boolean;
+}
+
+export interface Invitation {
+  id: string;
+  group_id: string;
+  token: string;
+  created_by: string;
+  expires_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  group_id: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  entity_type: 'EXPENSE' | 'GROUP_MEMBER' | 'CATEGORY';
+  entity_id: string;
+  performed_by: string;
+  timestamp: string;
+  details: string;
 }
 
 export interface CategoryStatistic {
@@ -50,7 +98,8 @@ export interface ExpenseCreatePayload {
   payer_id: string;
   category: string;
   date: string;
-  participants_ids: string[];
+  participants_ids?: string[];
+  splits?: ExpenseSplit[];
 }
 
 export interface ExpenseFiltersState {
@@ -78,3 +127,4 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 export const TOKEN_KEY = 'tricount_token';
 export const ACTIVE_GROUP_KEY = 'tricount_active_group';
+export const OPTIMIZE_BALANCES_KEY = 'tricount_optimize_balances';

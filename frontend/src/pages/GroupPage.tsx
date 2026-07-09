@@ -1,10 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, PlusCircle, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { AlertCircle, ArrowLeft, PlusCircle, ChevronLeft, ChevronRight, Tag, Users, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
-import { EXPENSE_CATEGORIES, type ExpenseCreatePayload } from '../types';
+import { EXPENSE_CATEGORIES, type ExpenseCreatePayload, type ExpenseSplit, type SplitType } from '../types';
+import { SplitTypeSelector } from '../components/expenses/SplitTypeSelector';
+import { SplitPreview } from '../components/expenses/SplitPreview';
+import { InviteModal } from '../components/invitations/InviteModal';
+import { AuditLogPanel } from '../components/audit/AuditLogPanel';
+import { CategoryManager } from '../components/categories/CategoryManager';
+import { RoleBadge } from '../components/rbac/RoleBadge';
+import { PermissionGate } from '../components/rbac/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
+import { useGroupRole } from '../hooks/useGroupRole';
+import { validateSplits } from '../utils/splitValidation';
 
 export const GroupPage: React.FC = () => {
   const { groupId } = useParams();
@@ -19,7 +29,9 @@ export const GroupPage: React.FC = () => {
     loading,
     error,
     filters,
+    optimizeBalances,
     setFilters,
+    setOptimizeBalances,
     addExpense,
     deleteExpense,
     refreshAll,
@@ -32,8 +44,14 @@ export const GroupPage: React.FC = () => {
   const [category, setCategory] = useState('Comida');
   const [payerId, setPayerId] = useState('');
   const [participantsIds, setParticipantsIds] = useState<string[]>([]);
+  const [splitMode, setSplitMode] = useState<SplitType>('EQUAL');
+  const [splitValues, setSplitValues] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'balances' | 'expenses' | 'stats'>('balances');
+  const [activeTab, setActiveTab] = useState<'balances' | 'expenses' | 'stats' | 'members' | 'activity'>('balances');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteToken] = useState('demo-token-v3');
+  const [inviteExpiresAt] = useState('');
+  const [auditLogs] = useState([]);
 
   React.useEffect(() => {
     if (group) {
@@ -53,10 +71,35 @@ export const GroupPage: React.FC = () => {
     }
   }, [expenses, group, user?.id]);
 
+  const role = useGroupRole(user, group);
+  const permissions = usePermissions(role, user?.id);
+
   const handleToggleParticipant = (memberId: string) => {
     setParticipantsIds((current) =>
       current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId],
     );
+  };
+
+  const handleSplitValueChange = (memberId: string, value: string) => {
+    setSplitValues((current) => ({ ...current, [memberId]: Number(value) }));
+  };
+
+  const buildSplits = (): ExpenseSplit[] => {
+    if (splitMode === 'EQUAL') {
+      return participantsIds.map((memberId) => ({
+        user_id: memberId,
+        split_type: 'EQUAL',
+        split_value: 1,
+        calculated_amount: 0,
+      }));
+    }
+
+    return participantsIds.map((memberId) => ({
+      user_id: memberId,
+      split_type: splitMode,
+      split_value: splitValues[memberId] ?? 0,
+      calculated_amount: 0,
+    }));
   };
 
   const handleCreateExpense = async (event: React.FormEvent) => {
@@ -65,6 +108,13 @@ export const GroupPage: React.FC = () => {
 
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
+
+    const splits = buildSplits();
+    const validation = validateSplits(parsedAmount, splits, splitMode);
+    if (!validation.isValid) {
+      window.alert(validation.message);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -76,12 +126,14 @@ export const GroupPage: React.FC = () => {
         category,
         date: new Date().toISOString(),
         participants_ids: participantsIds,
+        splits,
       };
       await addExpense(payload);
       setDescription('');
       setAmount('');
       setCategory('Comida');
       setPayerId('');
+      setSplitValues({});
     } finally {
       setSubmitting(false);
     }
@@ -149,15 +201,17 @@ export const GroupPage: React.FC = () => {
           </div>
         </section>
 
-        <div className="mb-6 flex gap-3 border-b border-white/10 pb-3">
+        <div className="mb-6 flex flex-wrap gap-3 border-b border-white/10 pb-3">
           {[
             ['balances', 'Balances y deudas'],
             ['expenses', 'Gastos'],
             ['stats', 'Estadísticas'],
+            ['members', 'Miembros'],
+            ['activity', 'Actividad'],
           ].map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key as 'balances' | 'expenses' | 'stats')}
+              onClick={() => setActiveTab(key as 'balances' | 'expenses' | 'stats' | 'members' | 'activity')}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeTab === key ? 'bg-indigo-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
             >
               {label}
@@ -168,7 +222,13 @@ export const GroupPage: React.FC = () => {
         {activeTab === 'balances' && (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="glass rounded-3xl p-6">
-              <h2 className="text-lg font-semibold text-white">Cómo saldar las cuentas</h2>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Cómo saldar las cuentas</h2>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input type="checkbox" checked={optimizeBalances} onChange={(e) => setOptimizeBalances(e.target.checked)} />
+                  Optimizar deudas
+                </label>
+              </div>
               {balances.length === 0 ? (
                 <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-gray-400">
                   No hay balances para este grupo todavía.
@@ -181,7 +241,10 @@ export const GroupPage: React.FC = () => {
                         <p className="font-semibold text-white">{balance.debtor_id} debe</p>
                         <p className="text-sm text-gray-400">a {balance.creditor_id}</p>
                       </div>
-                      <div className="text-lg font-semibold text-indigo-400">{balance.amount.toFixed(2)}€</div>
+                      <div className="text-right">
+                        <p className="text-lg font-semibold text-indigo-400">{balance.amount.toFixed(2)}€</p>
+                        {balance.is_optimized && <p className="text-xs text-emerald-400">Optimizado</p>}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -189,7 +252,10 @@ export const GroupPage: React.FC = () => {
             </div>
 
             <div className="glass rounded-3xl p-6">
-              <h2 className="text-lg font-semibold text-white">Registrar gasto</h2>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Registrar gasto</h2>
+                <RoleBadge role={role} />
+              </div>
               <form onSubmit={handleCreateExpense} className="mt-4 space-y-3">
                 <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400" />
                 <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Importe" type="number" step="0.01" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400" />
@@ -213,10 +279,25 @@ export const GroupPage: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <button disabled={submitting || loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-70">
-                  <PlusCircle className="w-4 h-4" />
-                  {submitting ? 'Guardando...' : 'Crear gasto'}
-                </button>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-medium text-white">Reparto del gasto</p>
+                    <SplitTypeSelector value={splitMode} onChange={setSplitMode} />
+                  </div>
+                  {participantsIds.map((memberId) => (
+                    <div key={memberId} className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0b0f19]/70 px-3 py-2">
+                      <span className="text-sm text-gray-300">{memberId}</span>
+                      <input value={splitValues[memberId] ?? ''} onChange={(e) => handleSplitValueChange(memberId, e.target.value)} placeholder={splitMode === 'PERCENTAGE' ? '60' : splitMode === 'EXACT' ? '20.00' : '1'} className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white" />
+                    </div>
+                  ))}
+                  <SplitPreview amount={Number(amount || 0)} mode={splitMode} splits={buildSplits()} />
+                </div>
+                <PermissionGate allowed={permissions.canCreateExpense} fallback={<p className="text-sm text-gray-400">No tienes permisos para crear gastos en este grupo.</p>}>
+                  <button disabled={submitting || loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-70">
+                    <PlusCircle className="w-4 h-4" />
+                    {submitting ? 'Guardando...' : 'Crear gasto'}
+                  </button>
+                </PermissionGate>
               </form>
             </div>
           </div>
@@ -280,26 +361,66 @@ export const GroupPage: React.FC = () => {
         )}
 
         {activeTab === 'stats' && (
-          <div className="glass rounded-3xl p-6">
-            <h2 className="text-lg font-semibold text-white">Estadísticas por categoría</h2>
-            {statistics.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-gray-400">Todavía no hay datos estadísticos para este grupo.</div>
-            ) : (
-              <div className="mt-6 space-y-3">
-                {statistics.map((statistic) => (
-                  <div key={statistic.category} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center gap-2 text-white">
-                      <Tag className="w-4 h-4 text-indigo-400" />
-                      <span>{statistic.category}</span>
+          <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+            <div className="glass rounded-3xl p-6">
+              <h2 className="text-lg font-semibold text-white">Estadísticas por categoría</h2>
+              {statistics.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-gray-400">Todavía no hay datos estadísticos para este grupo.</div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {statistics.map((statistic) => (
+                    <div key={statistic.category} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center gap-2 text-white">
+                        <Tag className="w-4 h-4 text-indigo-400" />
+                        <span>{statistic.category}</span>
+                      </div>
+                      <span className="font-semibold text-indigo-400">{statistic.total_amount.toFixed(2)}€</span>
                     </div>
-                    <span className="font-semibold text-indigo-400">{statistic.total_amount.toFixed(2)}€</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+            <CategoryManager categories={[]} />
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div className="glass rounded-3xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Miembros del grupo</h2>
+                <p className="text-sm text-gray-400">Invita personas y gestiona la participación.</p>
               </div>
-            )}
+              <PermissionGate allowed={permissions.canGenerateInvite} fallback={<span className="text-sm text-gray-400">Sin permisos para invitar</span>}>
+                <button onClick={() => setInviteOpen(true)} className="rounded-xl bg-indigo-500 px-3 py-2 text-sm font-semibold text-white">
+                  Invitar
+                </button>
+              </PermissionGate>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-indigo-500/10 p-2 text-indigo-400"><Users className="w-4 h-4" /></div>
+                <div>
+                  <p className="font-semibold text-white">{user?.name}</p>
+                  <p className="text-sm text-gray-400">{role ?? 'MEMBER'}</p>
+                </div>
+                <RoleBadge role={role} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="glass rounded-3xl p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-lg font-semibold text-white">Actividad reciente</h2>
+            </div>
+            <AuditLogPanel logs={auditLogs as any[]} />
           </div>
         )}
       </main>
+      <InviteModal open={inviteOpen} token={inviteToken} expiresAt={inviteExpiresAt} onClose={() => setInviteOpen(false)} />
     </div>
   );
 };
