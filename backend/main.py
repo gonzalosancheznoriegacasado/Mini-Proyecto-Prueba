@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.api.routes import persons, expenses, balances, auth, groups, categories
+from backend.api.routes import persons, expenses, balances, auth, groups, categories, audit_logs
 from backend.db.database import engine, Base
 
 app = FastAPI(
@@ -13,6 +13,7 @@ app.include_router(groups.router, prefix="/groups", tags=["groups"])
 app.include_router(persons.router, prefix="/persons", tags=["persons"])
 app.include_router(expenses.router, prefix="/expenses", tags=["expenses"])
 app.include_router(balances.router, prefix="/groups", tags=["balances"])
+app.include_router(audit_logs.router, prefix="/groups", tags=["audit-logs"])
 app.include_router(categories.router, tags=["categories"])
 
 @app.get("/")

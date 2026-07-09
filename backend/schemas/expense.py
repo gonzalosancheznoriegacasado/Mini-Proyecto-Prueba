@@ -27,6 +27,15 @@ class ExpenseCreate(BaseModel):
     date: datetime
     splits: List[ExpenseSplitCreate]
 
+class ExpenseUpdate(BaseModel):
+    description: str | None = None
+    amount: float | None = None
+    category_id: str | None = None
+    payer_id: UUID | None = None
+    date: datetime | None = None
+    splits: List[ExpenseSplitCreate] | None = None
+
+
 class ExpenseResponse(BaseModel):
     id: UUID
     group_id: UUID
