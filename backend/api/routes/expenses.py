@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from typing import List, Optional
 from uuid import UUID
 
 from backend.models.expense import Expense
+from backend.models.group import GroupMember
 from backend.models.person import Person
 from backend.schemas.expense import ExpenseCreate, ExpenseResponse, PaginatedExpenseResponse
 from backend.api.deps import get_db, get_current_user
+from backend.api.rbac import require_group_member, require_expense_owner_or_admin
 from backend.services.expense_service import calculate_splits
 
 router = APIRouter()
 
-@router.post("/", response_model=ExpenseResponse, status_code=201)
+@router.post("/", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 def create_expense(
     expense_in: ExpenseCreate, 
     db: Session = Depends(get_db),
@@ -21,6 +23,14 @@ def create_expense(
     """
     Registra un nuevo gasto.
     """
+    # Verificar membresía al grupo
+    member = db.query(GroupMember).filter(
+        GroupMember.group_id == expense_in.group_id,
+        GroupMember.person_id == current_user.id
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="No tienes permisos para realizar esta acción")
+
     new_expense = Expense(
         group_id=expense_in.group_id,
         description=expense_in.description,
@@ -38,6 +48,18 @@ def create_expense(
     db.commit()
     db.refresh(new_expense)
     return new_expense
+
+@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(
+    expense: Expense = Depends(require_expense_owner_or_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Solo el dueño del gasto o un ADMIN del grupo pueden eliminarlo.
+    """
+    db.delete(expense)
+    db.commit()
+    return
 
 @router.get("/", response_model=PaginatedExpenseResponse)
 def get_expenses(
