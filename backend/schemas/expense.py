@@ -22,7 +22,7 @@ class ExpenseCreate(BaseModel):
     group_id: UUID
     description: str
     amount: float
-    category: str
+    category_id: str
     payer_id: UUID
     date: datetime
     splits: List[ExpenseSplitCreate]
@@ -32,7 +32,7 @@ class ExpenseResponse(BaseModel):
     group_id: UUID
     description: str
     amount: float
-    category: str
+    category_id: str
     payer_id: UUID
     date: datetime
     splits: List[ExpenseSplitResponse] = Field(default_factory=list)

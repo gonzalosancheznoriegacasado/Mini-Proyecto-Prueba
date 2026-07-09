@@ -40,7 +40,7 @@ def db(db_engine):
     connection.close()
 
 @pytest.fixture
-def client(db):
+def client(db, mock_users):
     def override_get_db():
         try:
             yield db
@@ -48,7 +48,7 @@ def client(db):
             pass
 
     def override_get_current_user():
-        return Person(id=uuid.uuid4(), name="Test User", email="test@test.com")
+        return mock_users[0]
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
@@ -58,8 +58,18 @@ def client(db):
 
 @pytest.fixture
 def mock_group(db, mock_users):
+    from backend.models.group import GroupMember, RoleEnum
     group = Group(id=uuid.uuid4(), name="Test Group", created_by=mock_users[0].id)
     db.add(group)
+    
+    # Add creator as member
+    member = GroupMember(
+        group_id=group.id,
+        person_id=mock_users[0].id,
+        role=RoleEnum.ADMIN
+    )
+    db.add(member)
+    
     db.commit()
     return group
 

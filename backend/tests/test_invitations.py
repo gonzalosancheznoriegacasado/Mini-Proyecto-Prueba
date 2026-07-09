@@ -9,10 +9,8 @@ from backend.models.invitation import Invitation
 from backend.api.deps import get_current_user
 
 def test_generate_invitation_success(client, db, mock_group, mock_users):
-    # Hacer que mock_users[0] sea miembro del grupo
-    member = GroupMember(group_id=mock_group.id, person_id=mock_users[0].id, role=RoleEnum.MEMBER)
-    db.add(member)
-    db.commit()
+    # mock_users[0] is already added as ADMIN by mock_group fixture
+
     
     # Sobreescribir el current user para que sea mock_users[0]
     app.dependency_overrides[get_current_user] = lambda: mock_users[0]

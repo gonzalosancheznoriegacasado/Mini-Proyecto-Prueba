@@ -11,6 +11,8 @@ from backend.schemas.expense import ExpenseCreate, ExpenseResponse, PaginatedExp
 from backend.api.deps import get_db, get_current_user
 from backend.api.rbac import require_group_member, require_expense_owner_or_admin
 from backend.services.expense_service import calculate_splits
+from backend.models.category import CustomCategory
+import uuid
 
 router = APIRouter()
 
@@ -31,11 +33,23 @@ def create_expense(
     if not member:
         raise HTTPException(status_code=403, detail="No tienes permisos para realizar esta acción")
 
+    # Validate category
+    try:
+        category_uuid = uuid.UUID(expense_in.category_id)
+        # It's a UUID, check if it exists in CustomCategory
+        custom_category = db.query(CustomCategory).filter(CustomCategory.id == category_uuid).first()
+        if custom_category:
+            if custom_category.group_id != expense_in.group_id:
+                raise HTTPException(status_code=400, detail="La categoría no pertenece a este grupo")
+    except ValueError:
+        # Not a UUID, assume global category, allow it
+        pass
+
     new_expense = Expense(
         group_id=expense_in.group_id,
         description=expense_in.description,
         amount=expense_in.amount,
-        category=expense_in.category,
+        category_id=expense_in.category_id,
         payer_id=expense_in.payer_id,
         date=expense_in.date
     )
@@ -65,7 +79,7 @@ def delete_expense(
 def get_expenses(
     group_id: Optional[UUID] = None,
     payer_id: Optional[UUID] = None,
-    category: Optional[str] = None,
+    category_id: Optional[str] = None,
     limit: int = 10,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -80,8 +94,8 @@ def get_expenses(
         query = query.filter(Expense.group_id == group_id)
     if payer_id:
         query = query.filter(Expense.payer_id == payer_id)
-    if category:
-        query = query.filter(Expense.category == category)
+    if category_id:
+        query = query.filter(Expense.category_id == category_id)
         
     total = query.count()
     

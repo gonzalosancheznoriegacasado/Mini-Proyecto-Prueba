@@ -78,11 +78,11 @@ def get_group_statistics(
     Devuelve las estadísticas de gastos por categoría para un grupo específico.
     """
     stats = db.query(
-        Expense.category,
+        Expense.category_id,
         func.sum(Expense.amount).label("total_amount")
-    ).filter(Expense.group_id == group_id).group_by(Expense.category).all()
+    ).filter(Expense.group_id == group_id).group_by(Expense.category_id).all()
     
-    return [{"category": stat.category, "total_amount": stat.total_amount} for stat in stats]
+    return [{"category": stat.category_id, "total_amount": stat.total_amount} for stat in stats]
 
 @router.post("/{group_id}/generate-invite", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 def generate_invite(

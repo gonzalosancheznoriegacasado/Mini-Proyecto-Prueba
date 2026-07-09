@@ -11,7 +11,7 @@ def test_create_expense_exact_success(client, mock_group, mock_users):
         "group_id": str(mock_group.id),
         "description": "Cena",
         "amount": 100.0,
-        "category": "Food",
+        "category_id": "general",
         "payer_id": str(mock_users[0].id),
         "date": datetime.datetime.now().isoformat(),
         "splits": [
@@ -48,7 +48,7 @@ def test_create_expense_percentage_success(client, mock_group, mock_users):
         "group_id": str(mock_group.id),
         "description": "Viaje",
         "amount": 200.0,
-        "category": "Travel",
+        "category_id": "travel",
         "payer_id": str(mock_users[0].id),
         "date": datetime.datetime.now().isoformat(),
         "splits": [
@@ -81,7 +81,7 @@ def test_create_expense_shares_success(client, mock_group, mock_users):
         "group_id": str(mock_group.id),
         "description": "Hotel",
         "amount": 150.0,
-        "category": "Accommodation",
+        "category_id": "accommodation",
         "payer_id": str(mock_users[0].id),
         "date": datetime.datetime.now().isoformat(),
         "splits": [
@@ -114,7 +114,7 @@ def test_create_expense_equal_rounding_error(client, mock_group, mock_users):
         "group_id": str(mock_group.id),
         "description": "Cervezas",
         "amount": 10.0,
-        "category": "Drinks",
+        "category_id": "drinks",
         "payer_id": str(mock_users[0].id),
         "date": datetime.datetime.now().isoformat(),
         "splits": [
@@ -154,7 +154,7 @@ def test_create_expense_exact_fail_400(client, mock_group, mock_users):
         "group_id": str(mock_group.id),
         "description": "Compra",
         "amount": 100.0,
-        "category": "Groceries",
+        "category_id": "groceries",
         "payer_id": str(mock_users[0].id),
         "date": datetime.datetime.now().isoformat(),
         "splits": [
@@ -175,3 +175,74 @@ def test_create_expense_exact_fail_400(client, mock_group, mock_users):
     assert response.status_code == 400
     assert "Sum of splits" in response.json()["detail"]
     assert "does not match total amount" in response.json()["detail"]
+
+def test_create_expense_custom_category_success(client, mock_group, mock_users, db):
+    # Create custom category
+    from backend.models.category import CustomCategory
+    category = CustomCategory(
+        group_id=mock_group.id,
+        name="Museo",
+        color_hex="#112233"
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    payload = {
+        "group_id": str(mock_group.id),
+        "description": "Entradas Museo",
+        "amount": 50.0,
+        "category_id": str(category.id),
+        "payer_id": str(mock_users[0].id),
+        "date": datetime.datetime.now().isoformat(),
+        "splits": [
+            {
+                "user_id": str(mock_users[0].id),
+                "split_type": SplitType.EQUAL.value,
+                "split_value": 0.0
+            }
+        ]
+    }
+    
+    response = client.post("/expenses/", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["category_id"] == str(category.id)
+
+def test_create_expense_custom_category_fail(client, mock_group, mock_users, db):
+    # Create another group and category
+    from backend.models.group import Group
+    from backend.models.category import CustomCategory
+    other_group = Group(name="Other Group", created_by=mock_users[0].id)
+    db.add(other_group)
+    db.commit()
+    db.refresh(other_group)
+
+    category = CustomCategory(
+        group_id=other_group.id,
+        name="Museo",
+        color_hex="#112233"
+    )
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    payload = {
+        "group_id": str(mock_group.id), # Trying to create in mock_group
+        "description": "Entradas",
+        "amount": 50.0,
+        "category_id": str(category.id), # But category is from other_group
+        "payer_id": str(mock_users[0].id),
+        "date": datetime.datetime.now().isoformat(),
+        "splits": [
+            {
+                "user_id": str(mock_users[0].id),
+                "split_type": SplitType.EQUAL.value,
+                "split_value": 0.0
+            }
+        ]
+    }
+    
+    response = client.post("/expenses/", json=payload)
+    assert response.status_code == 400
+    assert "La categoría no pertenece a este grupo" in response.json()["detail"]
