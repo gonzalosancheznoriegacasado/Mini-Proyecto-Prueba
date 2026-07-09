@@ -4,7 +4,7 @@ import { AlertCircle, ArrowLeft, PlusCircle, ChevronLeft, ChevronRight, Tag, Use
 import { useApp } from '../context/AppContext';
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
-import { EXPENSE_CATEGORIES, type ExpenseCreatePayload, type ExpenseSplit, type SplitType } from '../types';
+import { EXPENSE_CATEGORIES, type AuditLog, type CustomCategory, type ExpenseCreatePayload, type ExpenseSplit, type SplitType } from '../types';
 import { SplitTypeSelector } from '../components/expenses/SplitTypeSelector';
 import { SplitPreview } from '../components/expenses/SplitPreview';
 import { InviteModal } from '../components/invitations/InviteModal';
@@ -51,7 +51,32 @@ export const GroupPage: React.FC = () => {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteToken] = useState('demo-token-v3');
   const [inviteExpiresAt] = useState('');
-  const [auditLogs] = useState([]);
+  const [categories, setCategories] = useState<CustomCategory[]>([
+    { id: 'demo-cat-1', group_id: group?.id ?? 'demo', name: 'Comida', color_hex: '#6366f1' },
+    { id: 'demo-cat-2', group_id: group?.id ?? 'demo', name: 'Viajes', color_hex: '#14b8a6' },
+  ]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
+    {
+      id: 'demo-log-1',
+      group_id: group?.id ?? 'demo',
+      action: 'CREATE',
+      entity_type: 'EXPENSE',
+      entity_id: 'exp-1',
+      performed_by: user?.id ?? 'demo-user',
+      timestamp: new Date().toISOString(),
+      details: 'Se añadió un gasto de comida para el viaje de fin de semana.',
+    },
+    {
+      id: 'demo-log-2',
+      group_id: group?.id ?? 'demo',
+      action: 'UPDATE',
+      entity_type: 'CATEGORY',
+      entity_id: 'cat-1',
+      performed_by: user?.id ?? 'demo-user',
+      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      details: 'Se actualizó la categoría de transporte para el grupo.',
+    },
+  ]);
 
   React.useEffect(() => {
     if (group) {
@@ -82,6 +107,29 @@ export const GroupPage: React.FC = () => {
 
   const handleSplitValueChange = (memberId: string, value: string) => {
     setSplitValues((current) => ({ ...current, [memberId]: Number(value) }));
+  };
+
+  const handleAddCategory = (name: string, color: string) => {
+    const nextCategory: CustomCategory = {
+      id: `cat-${Date.now()}`,
+      group_id: group?.id ?? 'demo',
+      name: name.trim(),
+      color_hex: color,
+    };
+    setCategories((current) => [nextCategory, ...current]);
+    setAuditLogs((current) => [
+      {
+        id: `log-${Date.now()}`,
+        group_id: group?.id ?? 'demo',
+        action: 'CREATE',
+        entity_type: 'CATEGORY',
+        entity_id: nextCategory.id,
+        performed_by: user?.id ?? 'demo-user',
+        timestamp: new Date().toISOString(),
+        details: `Se creó la categoría ${nextCategory.name}.`,
+      },
+      ...current,
+    ]);
   };
 
   const buildSplits = (): ExpenseSplit[] => {
@@ -187,15 +235,15 @@ export const GroupPage: React.FC = () => {
         )}
 
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-2xl p-5 animate-card">
             <p className="text-sm text-gray-400">Gastos totales</p>
             <p className="mt-2 text-2xl font-semibold text-white">{totalExpenses.toFixed(2)}€</p>
           </div>
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-2xl p-5 animate-card">
             <p className="text-sm text-gray-400">Balance</p>
             <p className="mt-2 text-2xl font-semibold text-white">{balances.length}</p>
           </div>
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-2xl p-5 animate-card">
             <p className="text-sm text-gray-400">Estadísticas</p>
             <p className="mt-2 text-2xl font-semibold text-white">{statistics.length}</p>
           </div>
@@ -212,7 +260,7 @@ export const GroupPage: React.FC = () => {
             <button
               key={key}
               onClick={() => setActiveTab(key as 'balances' | 'expenses' | 'stats' | 'members' | 'activity')}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeTab === key ? 'bg-indigo-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${activeTab === key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-gray-300 hover:bg-white/10 hover:-translate-y-0.5'}`}
             >
               {label}
             </button>
@@ -220,7 +268,7 @@ export const GroupPage: React.FC = () => {
         </div>
 
         {activeTab === 'balances' && (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div key="balances" className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] animate-panel">
             <div className="glass rounded-3xl p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Cómo saldar las cuentas</h2>
@@ -236,7 +284,7 @@ export const GroupPage: React.FC = () => {
               ) : (
                 <div className="mt-6 space-y-3">
                   {balances.map((balance, index) => (
-                    <div key={`${balance.debtor_id}-${balance.creditor_id}-${index}`} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div key={`${balance.debtor_id}-${balance.creditor_id}-${index}`} className="hover-lift flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div>
                         <p className="font-semibold text-white">{balance.debtor_id} debe</p>
                         <p className="text-sm text-gray-400">a {balance.creditor_id}</p>
@@ -251,7 +299,7 @@ export const GroupPage: React.FC = () => {
               )}
             </div>
 
-            <div className="glass rounded-3xl p-6">
+            <div className="glass rounded-3xl p-6 hover-lift">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Registrar gasto</h2>
                 <RoleBadge role={role} />
@@ -304,7 +352,7 @@ export const GroupPage: React.FC = () => {
         )}
 
         {activeTab === 'expenses' && (
-          <div className="glass rounded-3xl p-6">
+          <div key="expenses" className="glass rounded-3xl p-6 animate-panel">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Gastos del grupo</h2>
@@ -327,7 +375,7 @@ export const GroupPage: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {expenses.map((expense) => (
-                  <div key={expense.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-center md:justify-between">
+                  <div key={expense.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 hover-lift md:flex-row md:items-center md:justify-between">
                     <div>
                       <p className="font-semibold text-white">{expense.description}</p>
                       <p className="text-sm text-gray-400">{expense.category} • {expense.date}</p>
@@ -361,15 +409,15 @@ export const GroupPage: React.FC = () => {
         )}
 
         {activeTab === 'stats' && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-            <div className="glass rounded-3xl p-6">
+          <div key="stats" className="grid gap-6 lg:grid-cols-[1fr_0.8fr] animate-panel">
+            <div className="glass rounded-3xl p-6 hover-lift">
               <h2 className="text-lg font-semibold text-white">Estadísticas por categoría</h2>
               {statistics.length === 0 ? (
                 <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-gray-400">Todavía no hay datos estadísticos para este grupo.</div>
               ) : (
                 <div className="mt-6 space-y-3">
                   {statistics.map((statistic) => (
-                    <div key={statistic.category} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div key={statistic.category} className="hover-lift flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="flex items-center gap-2 text-white">
                         <Tag className="w-4 h-4 text-indigo-400" />
                         <span>{statistic.category}</span>
@@ -380,12 +428,12 @@ export const GroupPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <CategoryManager categories={[]} />
+            <CategoryManager categories={categories} onAddCategory={handleAddCategory} />
           </div>
         )}
 
         {activeTab === 'members' && (
-          <div className="glass rounded-3xl p-6">
+          <div key="members" className="glass rounded-3xl p-6 animate-panel">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">Miembros del grupo</h2>
@@ -397,7 +445,7 @@ export const GroupPage: React.FC = () => {
                 </button>
               </PermissionGate>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 hover-lift">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-indigo-500/10 p-2 text-indigo-400"><Users className="w-4 h-4" /></div>
                 <div>
@@ -411,12 +459,12 @@ export const GroupPage: React.FC = () => {
         )}
 
         {activeTab === 'activity' && (
-          <div className="glass rounded-3xl p-6">
+          <div key="activity" className="glass rounded-3xl p-6 animate-panel">
             <div className="mb-4 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-indigo-400" />
               <h2 className="text-lg font-semibold text-white">Actividad reciente</h2>
             </div>
-            <AuditLogPanel logs={auditLogs as any[]} />
+            <AuditLogPanel logs={auditLogs} />
           </div>
         )}
       </main>
