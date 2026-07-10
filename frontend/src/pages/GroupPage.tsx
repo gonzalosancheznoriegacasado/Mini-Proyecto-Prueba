@@ -171,7 +171,7 @@ export const GroupPage: React.FC = () => {
         description: description.trim(),
         amount: parsedAmount,
         payer_id: payerId,
-        category,
+        category_id: category,
         date: new Date().toISOString(),
         participants_ids: participantsIds,
         splits,

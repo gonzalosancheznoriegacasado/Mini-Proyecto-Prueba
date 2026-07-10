@@ -96,7 +96,7 @@ export interface ExpenseCreatePayload {
   description: string;
   amount: number;
   payer_id: string;
-  category: string;
+  category_id: string;
   date: string;
   participants_ids?: string[];
   splits?: ExpenseSplit[];
