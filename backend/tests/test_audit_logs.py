@@ -46,8 +46,9 @@ def test_audit_log_on_update(client, mock_group, mock_users, db):
     
     # 3. Verificar que se creó el audit log
     logs = db.query(AuditLog).filter(AuditLog.entity_id == expense_id).all()
-    assert len(logs) == 1
-    log = logs[0]
+    assert len(logs) == 2
+    # El primero es el CREATE, el segundo es el UPDATE (dependiendo del orden)
+    log = next(l for l in logs if l.action == AuditAction.UPDATE)
     
     assert log.action == AuditAction.UPDATE
     assert log.entity_type == EntityType.EXPENSE

@@ -15,6 +15,7 @@ class ExpenseSplitResponse(BaseModel):
     split_type: SplitType
     split_value: float
     calculated_amount: float
+    user: PersonResponse
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -37,6 +37,18 @@ def create_category(
     db.commit()
     db.refresh(new_category)
     
+    from backend.models.audit_log import AuditLog, AuditAction, EntityType
+    audit_log = AuditLog(
+        group_id=group_id,
+        action=AuditAction.CREATE,
+        entity_type=EntityType.CATEGORY,
+        entity_id=str(new_category.id),
+        performed_by=current_user.id,
+        details={"name": new_category.name, "color_hex": new_category.color_hex}
+    )
+    db.add(audit_log)
+    db.commit()
+    
     return new_category
 
 @router.get("/groups/{group_id}/categories", response_model=List[CategoryResponse])

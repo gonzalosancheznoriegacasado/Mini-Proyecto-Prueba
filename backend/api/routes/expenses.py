@@ -62,6 +62,30 @@ def create_expense(
     db.add(new_expense)
     db.commit()
     db.refresh(new_expense)
+
+    new_data = {
+        "description": new_expense.description,
+        "amount": float(new_expense.amount),
+        "category_id": new_expense.category_id,
+        "payer_id": str(new_expense.payer_id),
+        "date": str(new_expense.date),
+        "splits": [
+            {"user_id": str(s.user_id), "split_type": s.split_type.value, "split_value": float(s.split_value) if s.split_value else 0.0, "calculated_amount": float(s.calculated_amount)}
+            for s in new_expense.splits
+        ]
+    }
+
+    audit_log = AuditLog(
+        group_id=new_expense.group_id,
+        action=AuditAction.CREATE,
+        entity_type=EntityType.EXPENSE,
+        entity_id=str(new_expense.id),
+        performed_by=current_user.id,
+        details={"new_value": new_data}
+    )
+    db.add(audit_log)
+    db.commit()
+
     return new_expense
 
 @router.put("/{expense_id}", response_model=ExpenseResponse)
@@ -152,7 +176,7 @@ def delete_expense(
     """
     old_data = {
         "description": expense.description,
-        "amount": float(expense.amount),
+        "amount": float(expense.amount) if expense.amount is not None else 0.0,
         "category_id": expense.category_id,
         "payer_id": str(expense.payer_id),
         "date": str(expense.date),
@@ -203,7 +227,7 @@ def get_expenses(
     # Usamos joinedload para cargar ansiosamente los datos del payer (Person) y los splits
     expenses = query.options(
         joinedload(Expense.payer),
-        joinedload(Expense.splits)
+        joinedload(Expense.splits).joinedload(ExpenseSplit.user)
     ).offset(offset).limit(limit).all()
     
     return {
