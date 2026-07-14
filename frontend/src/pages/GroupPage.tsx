@@ -4,7 +4,8 @@ import { AlertCircle, ArrowLeft, PlusCircle, ChevronLeft, ChevronRight, Tag, Use
 import { useApp } from '../context/AppContext';
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
-import { EXPENSE_CATEGORIES, type AuditLog, type CustomCategory, type ExpenseCreatePayload, type ExpenseSplit, type SplitType } from '../types';
+import api from '../api/axios';
+import { EXPENSE_CATEGORIES, type AuditLog, type CustomCategory, type ExpenseCreatePayload, type ExpenseSplit, type SplitType, type User } from '../types';
 import { SplitTypeSelector } from '../components/expenses/SplitTypeSelector';
 import { SplitPreview } from '../components/expenses/SplitPreview';
 import { InviteModal } from '../components/invitations/InviteModal';
@@ -47,6 +48,7 @@ export const GroupPage: React.FC = () => {
   const [splitMode, setSplitMode] = useState<SplitType>('EQUAL');
   const [splitValues, setSplitValues] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'balances' | 'expenses' | 'stats' | 'members' | 'activity'>('balances');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteToken] = useState('demo-token-v3');
@@ -88,11 +90,28 @@ export const GroupPage: React.FC = () => {
     if (group) {
       const participantIds = expenses.flatMap((exp) => exp.participants_ids ?? []).filter(Boolean);
       const uniqueParticipants = Array.from(new Set(participantIds));
-      if (uniqueParticipants.length > 0) {
-        setParticipantsIds(uniqueParticipants);
-      } else if (user?.id) {
-        setParticipantsIds([user.id]);
-      }
+      
+      const loadMembers = async () => {
+        try {
+          const { data } = await api.get<User[]>(`/groups/${group.id}/members`);
+          setGroupMembers(data);
+          
+          if (uniqueParticipants.length > 0) {
+            setParticipantsIds(uniqueParticipants);
+          } else {
+            setParticipantsIds(data.map(m => m.id));
+          }
+        } catch (error) {
+          console.error('Failed to load group members', error);
+          if (uniqueParticipants.length > 0) {
+            setParticipantsIds(uniqueParticipants);
+          } else if (user?.id) {
+            setParticipantsIds([user.id]);
+          }
+        }
+      };
+      
+      loadMembers();
     }
   }, [expenses, group, user?.id]);
 
@@ -177,6 +196,21 @@ export const GroupPage: React.FC = () => {
         splits,
       };
       await addExpense(payload);
+      
+      setAuditLogs((current) => [
+        {
+          id: `log-${Date.now()}`,
+          group_id: group.id,
+          action: 'CREATE',
+          entity_type: 'EXPENSE',
+          entity_id: `exp-${Date.now()}`,
+          performed_by: user?.id ?? 'demo-user',
+          timestamp: new Date().toISOString(),
+          details: `Se añadió un gasto: ${description.trim()}.`,
+        },
+        ...current,
+      ]);
+
       setDescription('');
       setAmount('');
       setCategory('Comida');
@@ -283,18 +317,22 @@ export const GroupPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="mt-6 space-y-3">
-                  {balances.map((balance, index) => (
-                    <div key={`${balance.debtor_id}-${balance.creditor_id}-${index}`} className="hover-lift flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div>
-                        <p className="font-semibold text-white">{balance.debtor_id} debe</p>
-                        <p className="text-sm text-gray-400">a {balance.creditor_id}</p>
+                  {balances.map((balance, index) => {
+                    const debtorName = groupMembers.find(m => m.id === balance.debtor_id)?.name || balance.debtor_id;
+                    const creditorName = groupMembers.find(m => m.id === balance.creditor_id)?.name || balance.creditor_id;
+                    return (
+                      <div key={`${balance.debtor_id}-${balance.creditor_id}-${index}`} className="hover-lift flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div>
+                          <p className="font-semibold text-white">{debtorName} debe</p>
+                          <p className="text-sm text-gray-400">a {creditorName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold text-indigo-400">{balance.amount.toFixed(2)}€</p>
+                          {balance.is_optimized && <p className="text-xs text-emerald-400">Optimizado</p>}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-semibold text-indigo-400">{balance.amount.toFixed(2)}€</p>
-                        {balance.is_optimized && <p className="text-xs text-emerald-400">Optimizado</p>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -308,21 +346,23 @@ export const GroupPage: React.FC = () => {
                 <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400" />
                 <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Importe" type="number" step="0.01" className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400" />
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400">
-                  {EXPENSE_CATEGORIES.map((expenseCategory) => (
-                    <option key={expenseCategory} value={expenseCategory} className="text-gray-900">{expenseCategory}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name} className="text-gray-900">{c.name}</option>
                   ))}
                 </select>
                 <select value={payerId} onChange={(e) => setPayerId(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400">
                   <option value="">Selecciona pagador</option>
-                  <option value={user?.id}>{user?.name}</option>
+                  {groupMembers.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
                 </select>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-gray-300">
                   <p className="mb-2 font-medium text-white">Participantes</p>
                   <div className="flex flex-wrap gap-2">
-                    {participantsIds.map((memberId) => (
-                      <label key={memberId} className="rounded-full border border-white/10 bg-[#0b0f19] px-3 py-1 text-xs">
-                        <input type="checkbox" checked className="mr-2" onChange={() => handleToggleParticipant(memberId)} />
-                        {memberId}
+                    {groupMembers.map((member) => (
+                      <label key={member.id} className="rounded-full border border-white/10 bg-[#0b0f19] px-3 py-1 text-xs">
+                        <input type="checkbox" checked={participantsIds.includes(member.id)} className="mr-2" onChange={() => handleToggleParticipant(member.id)} />
+                        {member.name}
                       </label>
                     ))}
                   </div>
@@ -332,13 +372,21 @@ export const GroupPage: React.FC = () => {
                     <p className="text-sm font-medium text-white">Reparto del gasto</p>
                     <SplitTypeSelector value={splitMode} onChange={setSplitMode} />
                   </div>
-                  {participantsIds.map((memberId) => (
-                    <div key={memberId} className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0b0f19]/70 px-3 py-2">
-                      <span className="text-sm text-gray-300">{memberId}</span>
-                      <input value={splitValues[memberId] ?? ''} onChange={(e) => handleSplitValueChange(memberId, e.target.value)} placeholder={splitMode === 'PERCENTAGE' ? '60' : splitMode === 'EXACT' ? '20.00' : '1'} className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white" />
-                    </div>
-                  ))}
-                  <SplitPreview amount={Number(amount || 0)} mode={splitMode} splits={buildSplits()} />
+                  {participantsIds.map((memberId) => {
+                    const memberName = groupMembers.find(m => m.id === memberId)?.name || memberId;
+                    return (
+                      <div key={memberId} className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0b0f19]/70 px-3 py-2">
+                        <span className="text-sm text-gray-300">{memberName}</span>
+                        <input value={splitValues[memberId] ?? ''} onChange={(e) => handleSplitValueChange(memberId, e.target.value)} placeholder={splitMode === 'PERCENTAGE' ? '60' : splitMode === 'EXACT' ? '20.00' : '1'} className="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white" />
+                      </div>
+                    );
+                  })}
+                  <SplitPreview 
+                    amount={Number(amount || 0)} 
+                    mode={splitMode} 
+                    splits={buildSplits()} 
+                    userNames={groupMembers.reduce((acc, m) => ({...acc, [m.id]: m.name}), {})} 
+                  />
                 </div>
                 <PermissionGate allowed={permissions.canCreateExpense} fallback={<p className="text-sm text-gray-400">No tienes permisos para crear gastos en este grupo.</p>}>
                   <button disabled={submitting || loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-70">
@@ -361,8 +409,8 @@ export const GroupPage: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 <select value={filters.category} onChange={(e) => setFilters({ category: e.target.value, offset: 0 })} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none">
                   <option value="">Todas las categorías</option>
-                  {EXPENSE_CATEGORIES.map((categoryOption) => (
-                    <option key={categoryOption} value={categoryOption} className="text-gray-900">{categoryOption}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name} className="text-gray-900">{c.name}</option>
                   ))}
                 </select>
                 <button onClick={() => refreshAll()} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-gray-300 hover:bg-white/5">
@@ -374,23 +422,26 @@ export const GroupPage: React.FC = () => {
               <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center text-gray-400">No hay gastos para mostrar.</div>
             ) : (
               <div className="space-y-3">
-                {expenses.map((expense) => (
-                  <div key={expense.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 hover-lift md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold text-white">{expense.description}</p>
-                      <p className="text-sm text-gray-400">{expense.category} • {expense.date}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="font-semibold text-indigo-400">{expense.amount.toFixed(2)}€</p>
-                        <p className="text-xs text-gray-400">Pagado por {expense.payer_id}</p>
+                {expenses.map((expense) => {
+                  const payerName = groupMembers.find(m => m.id === expense.payer_id)?.name || expense.payer?.name || expense.payer_id;
+                  return (
+                    <div key={expense.id} className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 hover-lift md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold text-white">{expense.description}</p>
+                        <p className="text-sm text-gray-400">{expense.category} • {expense.date}</p>
                       </div>
-                      <button onClick={() => deleteExpense(expense.id)} className="rounded-xl border border-red-500/20 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10">
-                        Eliminar
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-semibold text-indigo-400">{expense.amount.toFixed(2)}€</p>
+                          <p className="text-xs text-gray-400">Pagado por {payerName}</p>
+                        </div>
+                        <button onClick={() => deleteExpense(expense.id)} className="rounded-xl border border-red-500/20 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10">
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <div className="mt-6 flex items-center justify-between text-sm text-gray-400">
