@@ -10,6 +10,7 @@ from backend.models.person import Person
 from backend.models.invitation import Invitation
 from backend.schemas.group import GroupCreate, GroupResponse, CategoryStatistic
 from backend.schemas.invitation import InvitationResponse
+from backend.schemas.person import PersonResponse
 from backend.api.deps import get_db, get_current_user
 from backend.api.rbac import require_group_admin
 import secrets
@@ -158,3 +159,24 @@ def join_group(
     db.commit()
     
     return {"message": "Te has unido al grupo exitosamente", "group_id": str(invitation.group_id)}
+
+
+@router.get("/{group_id}/members", response_model=List[PersonResponse])
+def get_group_members(
+    group_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Person = Depends(get_current_user)
+):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+        
+    membership = db.query(GroupMember).filter(
+        GroupMember.group_id == group_id,
+        GroupMember.person_id == current_user.id
+    ).first()
+    
+    if not membership:
+        raise HTTPException(status_code=403, detail="No perteneces a este grupo")
+        
+    return group.members
