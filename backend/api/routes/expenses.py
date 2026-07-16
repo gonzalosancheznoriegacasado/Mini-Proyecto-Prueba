@@ -17,7 +17,7 @@ from backend.services.expense_service import calculate_splits
 
 router = APIRouter()
 
-@router.post("/", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 def create_expense(
     expense_in: ExpenseCreate, 
     db: Session = Depends(get_db),
@@ -200,7 +200,7 @@ def delete_expense(
     db.commit()
     return
 
-@router.get("/", response_model=PaginatedExpenseResponse)
+@router.get("", response_model=PaginatedExpenseResponse)
 def get_expenses(
     group_id: Optional[UUID] = None,
     payer_id: Optional[UUID] = None,

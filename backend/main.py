@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import persons, expenses, balances, auth, groups, categories, audit_logs
 from backend.db.database import engine, Base
 
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="Mini-Tricount API",
     description="API para gestionar gastos y personas del grupo.",
@@ -12,7 +14,7 @@ app = FastAPI(
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174", "https://dev-frontend-service-684957121925.europe-southwest1.run.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

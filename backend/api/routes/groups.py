@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
-@router.post("/", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
 def create_group(
     group_in: GroupCreate, 
     db: Session = Depends(get_db),
@@ -58,7 +58,7 @@ def delete_group(
     db.commit()
     return
 
-@router.get("/", response_model=List[GroupResponse])
+@router.get("", response_model=List[GroupResponse])
 def get_groups(
     db: Session = Depends(get_db),
     current_user: Person = Depends(get_current_user)

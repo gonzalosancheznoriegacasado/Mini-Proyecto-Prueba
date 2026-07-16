@@ -1,0 +1,37 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches:
+      - Backend
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Build and Push Docker image
+      run: |
+        gcloud builds submit --tag europe-southwest1-docker.pkg.dev/project-d9cf7253-c2d0-4f51-9ab/cloud-run-source-deploy/dev-app-service:${{ github.sha }}
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy dev-app-service \
+          --image europe-southwest1-docker.pkg.dev/project-d9cf7253-c2d0-4f51-9ab/cloud-run-source-deploy/dev-app-service:${{ github.sha }} \
+          --region europe-southwest1 \
+          --add-cloudsql-instances project-d9cf7253-c2d0-4f51-9ab:europe-southwest1:dev-postgres-instance \
+          --set-env-vars "DATABASE_URL=postgresql://dev_user:password_dev@/dev_db?host=/cloudsql/project-d9cf7253-c2d0-4f51-9ab:europe-southwest1:dev-postgres-instance"

@@ -8,7 +8,7 @@ from backend.api.deps import get_db, get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=PersonResponse, status_code=201)
+@router.post("", response_model=PersonResponse, status_code=201)
 def create_person(
     person_in: PersonCreate, 
     db: Session = Depends(get_db),
@@ -24,7 +24,7 @@ def create_person(
     db.refresh(new_person)
     return new_person
 
-@router.get("/", response_model=List[PersonResponse])
+@router.get("", response_model=List[PersonResponse])
 def get_persons(
     db: Session = Depends(get_db),
     current_user: Person = Depends(get_current_user)
