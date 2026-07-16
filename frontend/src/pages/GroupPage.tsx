@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
-import { EXPENSE_CATEGORIES, type AuditLog, type CustomCategory, type ExpenseCreatePayload, type ExpenseSplit, type SplitType, type User } from '../types';
+import { type AuditLog, type CustomCategory, type ExpenseCreatePayload, type ExpenseSplit, type SplitType, type User } from '../types';
 import { SplitTypeSelector } from '../components/expenses/SplitTypeSelector';
 import { SplitPreview } from '../components/expenses/SplitPreview';
 import { InviteModal } from '../components/invitations/InviteModal';
