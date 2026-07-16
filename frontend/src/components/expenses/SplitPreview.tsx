@@ -4,9 +4,10 @@ interface SplitPreviewProps {
   amount: number;
   mode: SplitType;
   splits: ExpenseSplit[];
+  userNames?: Record<string, string>;
 }
 
-export const SplitPreview = ({ amount, mode, splits }: SplitPreviewProps) => {
+export const SplitPreview = ({ amount, mode, splits, userNames = {} }: SplitPreviewProps) => {
   if (splits.length === 0) return null;
 
   const total = splits.reduce((sum, split) => sum + split.split_value, 0);
@@ -17,7 +18,7 @@ export const SplitPreview = ({ amount, mode, splits }: SplitPreviewProps) => {
       <div className="space-y-1">
         {splits.map((split) => (
           <div key={split.user_id} className="flex items-center justify-between">
-            <span>{split.user_id}</span>
+            <span>{userNames[split.user_id] || split.user_id}</span>
             <span className="text-indigo-400">
               {mode === 'PERCENTAGE' ? `${split.split_value}%` : mode === 'EXACT' ? `${split.split_value.toFixed(2)}€` : `${split.split_value}`}
             </span>

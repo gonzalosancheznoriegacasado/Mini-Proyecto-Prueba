@@ -76,7 +76,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         group_id: activeGroup.id,
         limit: filters.limit,
         offset: filters.offset,
-        ...(filters.category ? { category: filters.category } : {}),
+        ...(filters.category ? { category_id: filters.category } : {}),
         ...(filters.payer_id ? { payer_id: filters.payer_id } : {}),
       };
 
