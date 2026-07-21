@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, UserPlus, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const RegisterPage: React.FC = () => {
   const { register, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +29,8 @@ export const RegisterPage: React.FC = () => {
 
     try {
       await register(name, email, password);
-      navigate('/groups');
+      const from = location.state?.from?.pathname || '/groups';
+      navigate(from, { replace: true });
     } catch {
       setFormError('No se pudo crear la cuenta.');
     }

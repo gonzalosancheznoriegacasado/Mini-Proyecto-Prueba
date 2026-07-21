@@ -3,6 +3,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { GroupPage } from './pages/GroupPage';
+import { JoinGroupPage } from './pages/JoinGroupPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 
 const App = () => {
@@ -23,6 +24,14 @@ const App = () => {
         element={
           <ProtectedRoute>
             <GroupPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/join/:token"
+        element={
+          <ProtectedRoute>
+            <JoinGroupPage />
           </ProtectedRoute>
         }
       />

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, LogIn, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const { login, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
@@ -22,7 +23,8 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate('/groups');
+      const from = location.state?.from?.pathname || '/groups';
+      navigate(from, { replace: true });
     } catch {
       setFormError('No se pudo iniciar sesión.');
     }
