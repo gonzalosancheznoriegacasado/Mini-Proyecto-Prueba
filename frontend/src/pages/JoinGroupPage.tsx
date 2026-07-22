@@ -21,13 +21,25 @@ export const JoinGroupPage = () => {
         setStatus('success');
         setMessage(data?.message || 'Te has unido al grupo correctamente.');
         window.setTimeout(() => navigate(`/groups/${data?.group_id || ''}`), 800);
-      } catch {
-        setStatus('error');
-        setMessage('La invitación no es válida o ha expirado.');
+      } catch (error: any) {
+        if (error.response?.data?.detail === 'Ya eres miembro de este grupo') {
+          setStatus('success');
+          setMessage('Ya eres miembro de este grupo.');
+          // Redirect to the group page or just /groups
+          window.setTimeout(() => navigate('/groups'), 800);
+        } else {
+          setStatus('error');
+          setMessage(error.response?.data?.detail || 'La invitación no es válida o ha expirado.');
+        }
       }
     };
 
-    void joinGroup();
+    // prevent double execution in Strict Mode if already processed
+    let isMounted = true;
+    if (isMounted) {
+      void joinGroup();
+    }
+    return () => { isMounted = false; };
   }, [navigate, token]);
 
   return (
