@@ -51,8 +51,25 @@ export const GroupPage: React.FC = () => {
   const [groupMembers, setGroupMembers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'balances' | 'expenses' | 'stats' | 'members' | 'activity'>('balances');
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteToken] = useState('demo-token-v3');
-  const [inviteExpiresAt] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
+  const [inviteExpiresAt, setInviteExpiresAt] = useState('');
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+
+  const handleOpenInvite = async () => {
+    if (!group) return;
+    setGeneratingInvite(true);
+    try {
+      const { data } = await api.post(`/groups/${group.id}/generate-invite`);
+      setInviteToken(data.token);
+      setInviteExpiresAt(data.expires_at || '');
+      setInviteOpen(true);
+    } catch (err) {
+      console.error('Error generating invite token:', err);
+      window.alert('No se pudo generar el enlace de invitación.');
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
   const [categories, setCategories] = useState<CustomCategory[]>([
     { id: 'demo-cat-1', group_id: group?.id ?? 'demo', name: 'Comida', color_hex: '#6366f1' },
     { id: 'demo-cat-2', group_id: group?.id ?? 'demo', name: 'Viajes', color_hex: '#14b8a6' },
@@ -491,8 +508,8 @@ export const GroupPage: React.FC = () => {
                 <p className="text-sm text-gray-400">Invita personas y gestiona la participación.</p>
               </div>
               <PermissionGate allowed={permissions.canGenerateInvite} fallback={<span className="text-sm text-gray-400">Sin permisos para invitar</span>}>
-                <button onClick={() => setInviteOpen(true)} className="rounded-xl bg-indigo-500 px-3 py-2 text-sm font-semibold text-white">
-                  Invitar
+                <button onClick={handleOpenInvite} disabled={generatingInvite} className="rounded-xl bg-indigo-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  {generatingInvite ? 'Generando...' : 'Invitar'}
                 </button>
               </PermissionGate>
             </div>
